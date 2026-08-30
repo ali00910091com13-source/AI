@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { GenItem } from '../lib/data';
 import { MODELS, faDigits, ratioById, styleById } from '../lib/data';
-import { IconClose, IconCopy, IconDownload, IconRefresh } from './icons';
+import { IconClose, IconCopy, IconDownload, IconRefresh, IconWand } from './icons';
 
 type Props = {
   item: GenItem | null;
@@ -70,14 +70,31 @@ export default function Lightbox({ item, onClose, onDownload, onCopy, onRegenera
           </div>
 
           <div>
-            <div className="mb-1.5 text-[11px] font-bold tracking-[0.16em] text-muted">پرامپت</div>
+            <div className="mb-1.5 text-[11px] font-bold tracking-[0.16em] text-muted">
+              توصیف شما
+            </div>
             <p
-              dir="ltr"
-              className="max-h-32 overflow-y-auto rounded-lg border border-ink-600 bg-ink-950/70 p-3 text-left text-xs leading-6 text-paper/85"
+              dir="auto"
+              className="max-h-24 overflow-y-auto rounded-lg border border-ink-600 bg-ink-950/70 p-3 text-xs leading-6 text-paper/85"
             >
               {item.userPrompt}
             </p>
           </div>
+
+          {item.prompt !== item.userPrompt && (
+            <div>
+              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-brand">
+                <IconWand className="h-3.5 w-3.5" />
+                پرامپت بهینه‌شده برای مدل
+              </div>
+              <p
+                dir="ltr"
+                className="max-h-28 overflow-y-auto rounded-lg border border-brand/25 bg-brand/[0.05] p-3 text-left text-xs leading-6 text-paper/85"
+              >
+                {item.prompt}
+              </p>
+            </div>
+          )}
 
           <dl className="grid grid-cols-2 gap-2 text-xs">
             {metas.map(([k, v]) => (

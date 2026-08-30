@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import Header from './components/Header';
 import ControlPanel from './components/ControlPanel';
 import CanvasArea from './components/CanvasArea';
@@ -13,6 +14,7 @@ import {
   SURPRISES,
   buildImageUrl,
   downloadImage,
+  enhancePrompt,
   faDigits,
   randomSeed,
   ratioById,
@@ -22,6 +24,7 @@ import {
 
 const HKEY = 'khayal-negar-history-v1';
 const TKEY = 'khayal-negar-total-v1';
+const EKEY = 'khayal-negar-enhance-v1';
 
 function loadHistory(): GenItem[] {
   try {
@@ -43,13 +46,70 @@ function loadTotal(): number {
   }
 }
 
+/* ---------- ErrorBoundary: صفحهٔ سفید ممنوع ---------- */
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div
+          dir="rtl"
+          className="grid min-h-screen place-items-center bg-ink-950 p-6 font-sans text-paper"
+        >
+          <div className="notch w-full max-w-md border border-coral/40 bg-ink-900 p-8 text-center">
+            <h1 className="font-display text-3xl">خطایی رخ داد</h1>
+            <p className="mt-3 text-sm leading-7 text-muted">
+              یک مشکل غیرمنتظره پیش آمد؛ صفحه را دوباره بارگذاری کن.
+            </p>
+            <p
+              dir="ltr"
+              className="mt-3 overflow-x-auto rounded-lg bg-ink-950 p-2.5 text-left text-[10px] leading-5 text-coral/80"
+            >
+              {String(this.state.error)}
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-5 rounded-lg bg-brand px-6 py-2.5 font-bold text-ink-950 transition hover:bg-brand-soft active:scale-95"
+            >
+              بارگذاری دوباره
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <Studio />
+    </ErrorBoundary>
+  );
+}
+
+function Studio() {
   const [prompt, setPrompt] = useState('');
   const [styleId, setStyleId] = useState('none');
   const [ratioId, setRatioId] = useState('sq');
   const [modelId, setModelId] = useState('flux');
   const [count, setCount] = useState(1);
   const [seed, setSeed] = useState('');
+  const [enhance, setEnhanceState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(EKEY) !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const [enhancing, setEnhancing] = useState(false);
 
   const [items, setItems] = useState<GenItem[]>([]);
   const [history, setHistory] = useState<GenItem[]>(loadHistory);
@@ -88,8 +148,20 @@ export default function App() {
   }, []);
 
   /* ---------- ساخت تصویر ---------- */
+  const setEnhance = useCallback((v: boolean) => {
+    setEnhanceState(v);
+    try {
+      localStorage.setItem(EKEY, v ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const handleGenerate = useCallback(
-    (sourcePrompt?: string) => {
+    async (sourcePrompt?: string) => {
+      /* جلوگیری از ساخت هم‌زمان دوطرفه (دکمه + Ctrl+Enter) */
+      if (enhancing || itemsRef.current.some((i) => i.status === 'loading')) return;
+
       const p = (sourcePrompt ?? prompt).trim();
       if (!p) {
         addToast('اول توصیفی برای تصویر بنویس!', 'warn');
@@ -100,8 +172,27 @@ export default function App() {
       const ratio = ratioById(ratioId) ?? ratioById('sq')!;
       const locked = seed.trim() !== '' ? Number(seed.trim()) : null;
       const baseSeed = locked ?? randomSeed();
-      const full = style && style.tokens ? `${p}, ${style.tokens}` : p;
+      const tokens = style && style.tokens ? style.tokens : '';
 
+      /* مرحلهٔ ۱: بهینه‌سازی پرامپت — فارسی را به انگلیسیِ دقیق برمی‌گرداند
+         تا مدل، تصویرِ درستِ توصیفِ تو را بسازد. اگر سرویس در دسترس نبود،
+         بدون معطلی با همان پرامپت خودت ادامه می‌دهیم. */
+      let full: string;
+      if (enhance) {
+        setEnhancing(true);
+        try {
+          full = await enhancePrompt(p, tokens);
+        } catch {
+          full = tokens ? `${p}, ${tokens}` : p;
+          addToast('بهینه‌سازی پرامپت انجام نشد؛ با توصیف خودت ادامه دادم', 'warn');
+        } finally {
+          setEnhancing(false);
+        }
+      } else {
+        full = tokens ? `${p}, ${tokens}` : p;
+      }
+
+      /* مرحلهٔ ۲: ساخت تصویر */
       const batch: GenItem[] = Array.from({ length: count }, (_, i) => {
         const s = locked !== null ? (baseSeed + i) % 2147483647 : randomSeed();
         return {
@@ -126,7 +217,7 @@ export default function App() {
         count === 1 ? 'در حال ساخت تصویر…' : `در حال ساخت ${faDigits(count)} تصویر…`,
       );
     },
-    [prompt, styleId, ratioId, modelId, count, seed, addToast],
+    [prompt, styleId, ratioId, modelId, count, seed, enhance, enhancing, addToast],
   );
 
   /* ---------- رویدادهای کارت‌ها ---------- */
@@ -192,8 +283,8 @@ export default function App() {
   const onCopy = useCallback(
     async (item: GenItem) => {
       try {
-        await navigator.clipboard.writeText(item.userPrompt);
-        addToast('پرامپت کپی شد');
+        await navigator.clipboard.writeText(item.prompt);
+        addToast('پرامپت نهایی کپی شد');
       } catch {
         addToast('کپی در مرورگر ممکن نشد', 'error');
       }
@@ -297,8 +388,11 @@ export default function App() {
               setCount={setCount}
               seed={seed}
               setSeed={setSeed}
-              generating={generating}
-              onGenerate={() => handleGenerate()}
+              enhance={enhance}
+              setEnhance={setEnhance}
+              enhancing={enhancing}
+              generating={generating || enhancing}
+              onGenerate={() => void handleGenerate()}
               onSurprise={onSurprise}
               textareaRef={textareaRef}
             />

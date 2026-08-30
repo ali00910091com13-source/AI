@@ -24,6 +24,9 @@ type Props = {
   setCount: (v: number) => void;
   seed: string;
   setSeed: (v: string) => void;
+  enhance: boolean;
+  setEnhance: (v: boolean) => void;
+  enhancing: boolean;
   generating: boolean;
   onGenerate: () => void;
   onSurprise: () => void;
@@ -60,6 +63,9 @@ export default function ControlPanel({
   setCount,
   seed,
   setSeed,
+  enhance,
+  setEnhance,
+  enhancing,
   generating,
   onGenerate,
   onSurprise,
@@ -245,6 +251,43 @@ export default function ControlPanel({
           </p>
         </section>
 
+        {/* ---- پرامپت‌نویس هوشمند ---- */}
+        <section className="border-t border-ink-700/70 pt-5">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enhance}
+            onClick={() => setEnhance(!enhance)}
+            className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3.5 py-3 text-start transition-colors duration-200 active:scale-[0.99] ${
+              enhance
+                ? 'border-brand/50 bg-brand/[0.07]'
+                : 'border-ink-600 bg-ink-950/60 hover:border-ink-500'
+            }`}
+          >
+            <span>
+              <span className="flex items-center gap-1.5 text-sm font-bold text-paper">
+                <IconWand className={`h-4 w-4 ${enhance ? 'text-brand' : 'text-muted'}`} />
+                پرامپت‌نویس هوشمند
+              </span>
+              <span className="mt-1 block text-[10px] leading-5 text-muted">
+                توصیف فارسی‌ات را با هوش مصنوعی به پرامپت انگلیسیِ دقیق تبدیل می‌کند تا
+                تصویر، درست همان چیزی شود که گفتی.
+              </span>
+            </span>
+            <span
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-300 ${
+                enhance ? 'bg-brand' : 'bg-ink-600'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-paper shadow-md transition-all duration-300 ${
+                  enhance ? 'start-[22px]' : 'start-0.5'
+                }`}
+              />
+            </span>
+          </button>
+        </section>
+
         {/* ---- ساخت ---- */}
         <section className="border-t border-ink-700/70 pt-5">
           <button
@@ -254,10 +297,17 @@ export default function ControlPanel({
             className="notch-sm group flex w-full items-center justify-center gap-2.5 bg-brand px-4 py-3.5 font-display text-2xl text-ink-950 transition-all duration-200 hover:bg-brand-soft hover:shadow-[0_10px_40px_-8px_rgba(242,163,60,0.55)] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-brand disabled:hover:shadow-none"
           >
             {generating ? (
-              <>
-                <IconAperture className="h-6 w-6 animate-spin-slower" />
-                در حال ساخت…
-              </>
+              enhancing ? (
+                <>
+                  <IconWand className="h-6 w-6 animate-pulse" />
+                  بهینه‌سازی پرامپت…
+                </>
+              ) : (
+                <>
+                  <IconAperture className="h-6 w-6 animate-spin-slower" />
+                  در حال ساخت…
+                </>
+              )
             ) : (
               <>
                 <IconSparkle className="h-6 w-6 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />

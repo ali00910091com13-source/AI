@@ -90,6 +90,51 @@ export function buildImageUrl(
   return `${base}?${params.toString()}`;
 }
 
+const ENHANCE_SYSTEM =
+  'You are an expert prompt engineer for the Flux AI image model. The user describes an image, possibly in Persian/Farsi or another language. Translate the idea into English and rewrite it as ONE vivid, precise image-generation prompt. Preserve the user intent exactly; add concrete visual details about subject, environment, lighting, mood and composition. Output ONLY the final English prompt: no quotes, no prefixes, no explanations, maximum 70 words.';
+
+/**
+ * پرامپت کاربر (احتمالاً فارسی) را با هوش مصنوعی به یک پرامپت انگلیسیِ
+ * دقیق و بهینه برای مدل تصویرساز تبدیل می‌کند.
+ */
+export async function enhancePrompt(
+  userPrompt: string,
+  styleTokens: string,
+): Promise<string> {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), 25_000);
+  try {
+    const res = await fetch('https://text.pollinations.ai/openai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'openai',
+        private: true,
+        seed: randomSeed(),
+        messages: [
+          { role: 'system', content: ENHANCE_SYSTEM },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error('enhance request failed');
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    let text = data.choices?.[0]?.message?.content ?? '';
+    text = text
+      .replace(/^[\s"'`*_]+|[\s"'`*_]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (text.length < 6) throw new Error('empty enhancement');
+    text = text.slice(0, 420);
+    return styleTokens ? `${text}, ${styleTokens}` : text;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export async function downloadImage(item: GenItem): Promise<void> {
   const res = await fetch(item.url);
   if (!res.ok) throw new Error('fetch failed');
